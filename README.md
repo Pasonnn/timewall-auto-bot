@@ -1,0 +1,92 @@
+# Timewall Auto Clicker Bot
+
+A Python bot that automatically clicks through Timewall website to generate traffic.
+
+## Features
+
+- Automated clicking through Timewall pages
+- Configurable delays between clicks
+- Simulates real user behavior
+- Supports multiple browser sessions
+
+## Requirements
+
+- Python 3.7+
+- Selenium WebDriver
+- Chrome/Firefox browser
+- ChromeDriver/GeckoDriver
+
+## Installation
+
+1. Clone this repository
+   ```bash
+   git clone https://github.com/yourusername/timewall-auto-clicker.git
+   cd timewall-auto-clicker
+   ```
+
+2. Create and activate a virtual environment (recommended)
+   ```bash
+   # On Windows
+   python -m venv venv
+   venv\Scripts\activate
+
+   # On macOS/Linux
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+
+3. Install required packages
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Download the appropriate WebDriver for your browser:
+   - [ChromeDriver](https://sites.google.com/chromium.org/driver/) for Chrome
+   - [GeckoDriver](https://github.com/mozilla/geckodriver/releases) for Firefox
+
+   Make sure to add the WebDriver to your system PATH or place it in the project directory.
+
+## Configuration
+
+Edit the `config.py` file to customize the bot's behavior:
+
+```python
+# Example configuration
+TIMEWALL_URL = "https://example-timewall.com"
+MIN_DELAY = 5  # Minimum delay between clicks in seconds
+MAX_DELAY = 15  # Maximum delay between clicks in seconds
+SESSIONS = 3    # Number of browser sessions to run simultaneously
+```
+
+## Usage
+
+Run the bot with:
+
+```bash
+python main.py
+```
+
+Additional command-line options:
+```bash
+# Run with specific configuration file
+python main.py --config custom_config.py
+
+# Run in headless mode (no browser UI)
+python main.py --headless
+
+# Specify number of sessions
+python main.py --sessions 5
+```
+
+## Disclaimer
+
+This tool is for educational purposes only. Use responsibly and in accordance with the terms of service of any websites you interact with.
+
+## License
+
+This project is licensed under the MIT License. See the LICENSE file for details.
+
+## Contact
+
+For questions or feedback, please contact [your name](mailto:your.email@example.com).
+
