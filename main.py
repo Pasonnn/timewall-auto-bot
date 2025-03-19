@@ -2,9 +2,14 @@ import os
 import time
 import pickle
 import json
+import random
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 from dotenv import load_dotenv
 from webdriver_manager.chrome import ChromeDriverManager
 import pathlib
@@ -17,7 +22,7 @@ def main():
     timewall_url = os.getenv("TIMEWALL_URL", "https://timewall.io/clicks")
     
     if not timewall_url:
-        print("Error: URLs not found in .env file")
+        print("Error: URL not found in .env file")
         return
     
     # Create directories to store browser data and cookies
@@ -31,7 +36,7 @@ def main():
     chrome_options.add_argument("--start-maximized")  # Start with maximized browser
     chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
     
-    # Add options to help avoid security warnings
+    # Add options to help avoid security warnings and detection
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-web-security")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
@@ -52,9 +57,28 @@ def main():
         # Execute CDP commands to prevent detection
         driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
             "source": """
+                // Overwrite the 'navigator.webdriver' property to prevent detection
                 Object.defineProperty(navigator, 'webdriver', {
                     get: () => undefined
                 });
+                
+                // Overwrite the 'navigator.plugins' to make it look more realistic
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [1, 2, 3, 4, 5]
+                });
+                
+                // Overwrite the 'navigator.languages' property
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['en-US', 'en', 'es']
+                });
+                
+                // Prevent detection via permissions
+                const originalQuery = window.navigator.permissions.query;
+                window.navigator.permissions.query = (parameters) => (
+                    parameters.name === 'notifications' ?
+                        Promise.resolve({state: Notification.permission}) :
+                        originalQuery(parameters)
+                );
             """
         })
         
@@ -64,12 +88,9 @@ def main():
         return
     
     try:
-        # Open Timewall URL
+        # Open Timewall URL directly in the first tab
         print(f"Opening {timewall_url}...")
-        driver.execute_script(f"window.open('{timewall_url}', '_blank');")
-        
-        # Switch to the new tab
-        driver.switch_to.window(driver.window_handles[1])
+        driver.get(timewall_url)
         
         # Load Timewall cookies if they exist
         timewall_cookies_path = os.path.join(cookies_dir, "timewall_cookies.pkl")
@@ -87,8 +108,11 @@ def main():
             except Exception as e:
                 print(f"Error loading cookies: {e}")
         
-        # Wait for user to set up Timewall
-        input("Please set up Timewall and press Enter to continue...")
+        # Wait for page to load and handle Cloudflare if needed
+        handle_cloudflare(driver)
+        
+        # Wait for user to set up Timewall if needed
+        input("Please set up Timewall if needed and press Enter to continue...")
         
         print("Setup complete. Ready for automation.")
         
@@ -100,18 +124,7 @@ def main():
     finally:
         # Save cookies before closing
         try:
-            # Save FreeCash cookies
-            driver.switch_to.window(driver.window_handles[0])
-            freecash_cookies = driver.get_cookies()
-            with open(os.path.join(cookies_dir, "freecash_cookies.pkl"), "wb") as f:
-                pickle.dump(freecash_cookies, f)
-            
-            # Also save as JSON for debugging
-            with open(os.path.join(cookies_dir, "freecash_cookies.json"), "w") as f:
-                json.dump(freecash_cookies, f, indent=2)
-            
             # Save Timewall cookies
-            driver.switch_to.window(driver.window_handles[1])
             timewall_cookies = driver.get_cookies()
             with open(os.path.join(cookies_dir, "timewall_cookies.pkl"), "wb") as f:
                 pickle.dump(timewall_cookies, f)
@@ -127,6 +140,42 @@ def main():
         # Close the browser
         driver.quit()
         print("Browser closed.")
+
+def handle_cloudflare(driver, timeout=30):
+    """Handle Cloudflare challenges by waiting and helping with checkbox if needed."""
+    try:
+        print("Checking for Cloudflare challenge...")
+        
+        # Wait for Cloudflare to load
+        WebDriverWait(driver, 5).until(
+            EC.presence_of_element_located((By.ID, "challenge-form"))
+        )
+        
+        print("Cloudflare challenge detected. Waiting for it to process...")
+        
+        # Check for checkbox challenge
+        try:
+            checkbox = WebDriverWait(driver, 5).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, "input[type='checkbox']"))
+            )
+            print("Cloudflare checkbox found. Please click it manually.")
+            input("Press Enter after clicking the checkbox...")
+        except TimeoutException:
+            # No checkbox found, might be automatic challenge
+            print("No checkbox found. Waiting for automatic verification...")
+        
+        # Wait for the challenge to complete
+        WebDriverWait(driver, timeout).until_not(
+            EC.presence_of_element_located((By.ID, "challenge-form"))
+        )
+        
+        print("Cloudflare challenge completed successfully.")
+        
+    except TimeoutException:
+        # No Cloudflare challenge detected or it timed out
+        print("No Cloudflare challenge detected or it timed out.")
+    except Exception as e:
+        print(f"Error handling Cloudflare: {e}")
 
 if __name__ == "__main__":
     main()
