@@ -64,18 +64,6 @@ Run the bot with:
 python main.py
 ```
 
-Additional command-line options:
-```bash
-# Run with specific configuration file
-python main.py --config custom_config.py
-
-# Run in headless mode (no browser UI)
-python main.py --headless
-
-# Specify number of sessions
-python main.py --sessions 5
-```
-
 ## Disclaimer
 
 This tool is for educational purposes only. Use responsibly and in accordance with the terms of service of any websites you interact with.
