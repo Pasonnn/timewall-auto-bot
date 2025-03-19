@@ -10,7 +10,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
-
 from controller import click_view, read_timer, exit_tab, reopen_tab
 
 def main():
@@ -134,19 +133,21 @@ def main():
         # Main automation loop
         while True:
             try:
+                print(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - Starting loop")
                 # Read initial timer value
                 timer_value = read_timer(driver)
                 if timer_value == -1:
                     print("Could not read timer, retrying...")
-                    reopen_tab(driver)
-                    time.sleep(15)
-                    exit_tab(driver)
+                    print("No ads available, waiting 60 seconds before refreshing...")
+                    time.sleep(60)
+                    driver.refresh()
+                    time.sleep(60)
                     continue
 
                 # Click view button and wait for timer
                 if click_view(driver):
                     print(f"Waiting {timer_value} seconds...")
-                    time.sleep(timer_value+1)
+                    time.sleep(timer_value*1.5)
                     
                     # Close tab and return to main window
                     if not exit_tab(driver):
@@ -156,7 +157,7 @@ def main():
                             driver.switch_to.window(driver.window_handles[0])
                 
                 # Add small random delay between iterations
-                time.sleep(random.uniform(1, 3))
+                time.sleep(random.uniform(3, 5))
                 
             except Exception as e:
                 print(f"Error in automation loop: {e}")
