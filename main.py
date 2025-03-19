@@ -3,16 +3,15 @@ import time
 import pickle
 import json
 import random
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
+import pathlib
+from dotenv import load_dotenv
+import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
-from dotenv import load_dotenv
-from webdriver_manager.chrome import ChromeDriverManager
-import pathlib
+
+from controller import click_view, read_timer, exit_tab
 
 def main():
     # Load environment variables from .env file
@@ -31,60 +30,17 @@ def main():
     os.makedirs(user_data_dir, exist_ok=True)
     os.makedirs(cookies_dir, exist_ok=True)
     
-    # Set up Chrome options
-    chrome_options = Options()
+    # Set up undetected Chrome options
+    chrome_options = uc.ChromeOptions()
     chrome_options.add_argument("--start-maximized")  # Start with maximized browser
     chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
     
-    # Add options to help avoid security warnings and detection
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-web-security")
-    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    chrome_options.add_experimental_option("useAutomationExtension", False)
-    
-    # Set a realistic user agent
-    chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-    
-    # Uncomment the line below if you want to run in headless mode later
-    # chrome_options.add_argument("--headless=new")
-    
-    # Set up Chrome driver
+    # Set up undetected Chrome driver
     try:
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=chrome_options)
-        
-        # Execute CDP commands to prevent detection
-        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
-            "source": """
-                // Overwrite the 'navigator.webdriver' property to prevent detection
-                Object.defineProperty(navigator, 'webdriver', {
-                    get: () => undefined
-                });
-                
-                // Overwrite the 'navigator.plugins' to make it look more realistic
-                Object.defineProperty(navigator, 'plugins', {
-                    get: () => [1, 2, 3, 4, 5]
-                });
-                
-                // Overwrite the 'navigator.languages' property
-                Object.defineProperty(navigator, 'languages', {
-                    get: () => ['en-US', 'en', 'es']
-                });
-                
-                // Prevent detection via permissions
-                const originalQuery = window.navigator.permissions.query;
-                window.navigator.permissions.query = (parameters) => (
-                    parameters.name === 'notifications' ?
-                        Promise.resolve({state: Notification.permission}) :
-                        originalQuery(parameters)
-                );
-            """
-        })
-        
-        print("Chrome browser started successfully")
+        driver = uc.Chrome(options=chrome_options)
+        print("Undetected Chrome browser started successfully")
     except Exception as e:
-        print(f"Error starting Chrome browser: {e}")
+        print(f"Error starting undetected Chrome browser: {e}")
         return
     
     try:
@@ -108,16 +64,40 @@ def main():
             except Exception as e:
                 print(f"Error loading cookies: {e}")
         
-        # Wait for page to load and handle Cloudflare if needed
-        handle_cloudflare(driver)
-        
+    
         # Wait for user to set up Timewall if needed
         input("Please set up Timewall if needed and press Enter to continue...")
         
         print("Setup complete. Ready for automation.")
         
-        # Keep the browser open until user decides to close
-        input("Press Enter to close the browser...")
+        # Main automation loop
+        while True:
+            try:
+                # Read initial timer value
+                timer_value = read_timer(driver)
+                if timer_value == -1:
+                    print("Could not read timer, retrying...")
+                    time.sleep(5)
+                    continue
+
+                # Click view button and wait for timer
+                if click_view(driver):
+                    print(f"Waiting {timer_value} seconds...")
+                    time.sleep(timer_value+1)
+                    
+                    # Close tab and return to main window
+                    if not exit_tab(driver):
+                        print("Error closing tab, trying to recover...")
+                        # Try to switch back to main window
+                        if len(driver.window_handles) > 0:
+                            driver.switch_to.window(driver.window_handles[0])
+                
+                # Add small random delay between iterations
+                time.sleep(random.uniform(1, 3))
+                
+            except Exception as e:
+                print(f"Error in automation loop: {e}")
+                time.sleep(5)  # Wait before retrying on error
         
     except Exception as e:
         print(f"An error occurred: {e}")
@@ -140,42 +120,6 @@ def main():
         # Close the browser
         driver.quit()
         print("Browser closed.")
-
-def handle_cloudflare(driver, timeout=30):
-    """Handle Cloudflare challenges by waiting and helping with checkbox if needed."""
-    try:
-        print("Checking for Cloudflare challenge...")
-        
-        # Wait for Cloudflare to load
-        WebDriverWait(driver, 5).until(
-            EC.presence_of_element_located((By.ID, "challenge-form"))
-        )
-        
-        print("Cloudflare challenge detected. Waiting for it to process...")
-        
-        # Check for checkbox challenge
-        try:
-            checkbox = WebDriverWait(driver, 5).until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, "input[type='checkbox']"))
-            )
-            print("Cloudflare checkbox found. Please click it manually.")
-            input("Press Enter after clicking the checkbox...")
-        except TimeoutException:
-            # No checkbox found, might be automatic challenge
-            print("No checkbox found. Waiting for automatic verification...")
-        
-        # Wait for the challenge to complete
-        WebDriverWait(driver, timeout).until_not(
-            EC.presence_of_element_located((By.ID, "challenge-form"))
-        )
-        
-        print("Cloudflare challenge completed successfully.")
-        
-    except TimeoutException:
-        # No Cloudflare challenge detected or it timed out
-        print("No Cloudflare challenge detected or it timed out.")
-    except Exception as e:
-        print(f"Error handling Cloudflare: {e}")
 
 if __name__ == "__main__":
     main()
