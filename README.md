@@ -20,8 +20,8 @@ A Python bot that automatically clicks through Timewall website to generate traf
 
 1. Clone this repository
    ```bash
-   git clone https://github.com/yourusername/timewall-auto-clicker.git
-   cd timewall-auto-clicker
+   git clone https://github.com/Pasonnn/timewall-auto-bot.git
+   cd timewall-auto-bot
    ```
 
 2. Create and activate a virtual environment (recommended)
@@ -50,12 +50,10 @@ A Python bot that automatically clicks through Timewall website to generate traf
 
 Edit the `config.py` file to customize the bot's behavior:
 
-```python
-# Example configuration
-TIMEWALL_URL = "https://example-timewall.com"
-MIN_DELAY = 5  # Minimum delay between clicks in seconds
-MAX_DELAY = 15  # Maximum delay between clicks in seconds
-SESSIONS = 3    # Number of browser sessions to run simultaneously
+```.env
+# Example .env configuration
+FREECASH_URL = "https://freecash.com/"
+TIMEWALL_URL = "https://timewall.io/clicks"
 ```
 
 ## Usage
@@ -88,5 +86,5 @@ This project is licensed under the MIT License. See the LICENSE file for details
 
 ## Contact
 
-For questions or feedback, please contact [your name](mailto:your.email@example.com).
+For questions or feedback, please contact [pason.dev](mailto:pason.dev@gmail.com).
 
