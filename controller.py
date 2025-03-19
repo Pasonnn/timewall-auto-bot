@@ -123,3 +123,19 @@ def exit_tab(driver):
             pass
             
         return False
+    
+def reopen_tab(driver):
+        # Try to reopen the closed tab with Ctrl+Shift+T
+        try:
+            ActionChains(driver).key_down(Keys.CONTROL).key_down(Keys.SHIFT).send_keys('t').key_up(Keys.SHIFT).key_up(Keys.CONTROL).perform()
+            print("Sent Ctrl+Shift+T to reopen closed tab")
+            time.sleep(1)
+            
+            # Switch to the newly opened tab
+            if len(driver.window_handles) > 1:
+                driver.switch_to.window(driver.window_handles[-1])
+                print("Switched to reopened tab")
+                return True
+        except Exception as e:
+            print(f"Error reopening tab: {e}")
+            return False

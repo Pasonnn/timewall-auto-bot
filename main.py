@@ -4,14 +4,14 @@ import pickle
 import json
 import random
 import pathlib
+import sys
 from dotenv import load_dotenv
-import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 
-from controller import click_view, read_timer, exit_tab
+from controller import click_view, read_timer, exit_tab, reopen_tab
 
 def main():
     # Load environment variables from .env file
@@ -30,18 +30,80 @@ def main():
     os.makedirs(user_data_dir, exist_ok=True)
     os.makedirs(cookies_dir, exist_ok=True)
     
-    # Set up undetected Chrome options
-    chrome_options = uc.ChromeOptions()
-    chrome_options.add_argument("--start-maximized")  # Start with maximized browser
-    chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
-    
-    # Set up undetected Chrome driver
+    # Try to import undetected_chromedriver, fall back to regular selenium if needed
     try:
-        driver = uc.Chrome(options=chrome_options)
-        print("Undetected Chrome browser started successfully")
-    except Exception as e:
-        print(f"Error starting undetected Chrome browser: {e}")
-        return
+        import undetected_chromedriver as uc
+        print("Using undetected_chromedriver")
+        
+        # Set up undetected Chrome options
+        chrome_options = uc.ChromeOptions()
+        chrome_options.add_argument("--start-maximized")  # Start with maximized browser
+        chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
+        
+        # Set up undetected Chrome driver
+        try:
+            driver = uc.Chrome(options=chrome_options)
+            print("Undetected Chrome browser started successfully")
+        except Exception as e:
+            print(f"Error starting undetected Chrome browser: {e}")
+            print("Falling back to regular Chrome...")
+            raise ImportError("Fallback to regular Chrome")
+            
+    except (ImportError, Exception) as e:
+        print(f"Could not use undetected_chromedriver: {e}")
+        print("Using regular Selenium WebDriver instead")
+        
+        from selenium import webdriver
+        from selenium.webdriver.chrome.service import Service
+        from selenium.webdriver.chrome.options import Options
+        
+        # Try to use webdriver_manager if available
+        try:
+            from webdriver_manager.chrome import ChromeDriverManager
+            service = Service(ChromeDriverManager().install())
+        except Exception as e:
+            print(f"Could not use webdriver_manager: {e}")
+            print("Looking for chromedriver in current directory...")
+            
+            # Look for chromedriver in the current directory
+            if sys.platform.startswith('win'):
+                chromedriver_name = "chromedriver.exe"
+            else:
+                chromedriver_name = "chromedriver"
+                
+            if os.path.exists(chromedriver_name):
+                service = Service(executable_path=os.path.abspath(chromedriver_name))
+            else:
+                print(f"Error: {chromedriver_name} not found in current directory.")
+                print("Please download the appropriate chromedriver from:")
+                print("https://chromedriver.chromium.org/downloads")
+                return
+        
+        # Set up Chrome options
+        chrome_options = Options()
+        chrome_options.add_argument("--start-maximized")
+        chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        chrome_options.add_experimental_option("useAutomationExtension", False)
+        
+        # Set a realistic user agent
+        chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        
+        # Initialize the driver
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        
+        # Execute CDP commands to prevent detection
+        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+            "source": """
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+            """
+        })
+        
+        print("Regular Chrome browser started successfully")
     
     try:
         # Open Timewall URL directly in the first tab
@@ -63,7 +125,6 @@ def main():
                 print("Loaded saved Timewall session")
             except Exception as e:
                 print(f"Error loading cookies: {e}")
-        
     
         # Wait for user to set up Timewall if needed
         input("Please set up Timewall if needed and press Enter to continue...")
@@ -77,7 +138,9 @@ def main():
                 timer_value = read_timer(driver)
                 if timer_value == -1:
                     print("Could not read timer, retrying...")
-                    time.sleep(5)
+                    reopen_tab(driver)
+                    time.sleep(15)
+                    exit_tab(driver)
                     continue
 
                 # Click view button and wait for timer
